@@ -1,4 +1,4 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
@@ -7,6 +7,7 @@ export async function GET(req) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Не авторизовано' }, { status: 401 })
+    const rq = withSession(session)
 
     let sql, params
 
@@ -38,7 +39,7 @@ export async function GET(req) {
       params = [session.user.profileId]
     }
 
-    const result = await query(sql, params)
+    const result = await rq(sql, params)
     return NextResponse.json(result.rows)
   } catch (error) {
     return NextResponse.json({ error: 'Помилка' }, { status: 500 })
@@ -49,23 +50,24 @@ export async function POST(req) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Не авторизовано' }, { status: 401 })
+    const rq = withSession(session)
 
     const { projectId, contractorId, amount } = await req.json()
 
     // дістаємо client_id з проекту
-    const project = await query('SELECT client_id FROM Project WHERE project_id = $1', [projectId])
+    const project = await rq('SELECT client_id FROM Project WHERE project_id = $1', [projectId])
     if (project.rows.length === 0) {
       return NextResponse.json({ error: 'Проект не знайдено' }, { status: 404 })
     }
 
-    const result = await query(
+    const result = await rq(
       `INSERT INTO Deal (project_id, client_id, contractor_id, amount, status)
        VALUES ($1, $2, $3, $4, 'Pending') RETURNING *`,
       [projectId, project.rows[0].client_id, contractorId, amount]
     )
 
     // створюємо ескроу
-    await query(
+    await rq(
       'INSERT INTO Safe (deal_id, amount) VALUES ($1, $2)',
       [result.rows[0].deal_id, amount]
     )

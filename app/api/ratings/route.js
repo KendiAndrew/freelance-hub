@@ -1,10 +1,13 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(req) {
   try {
+    const session = await getServerSession(authOptions)
+    const rq = withSession(session)
+
     const { searchParams } = new URL(req.url)
     const contractorId = searchParams.get('contractorId')
 
@@ -21,7 +24,7 @@ export async function GET(req) {
     }
     sql += ' ORDER BY r.created_at DESC'
 
-    const result = await query(sql, params)
+    const result = await rq(sql, params)
     return NextResponse.json(result.rows)
   } catch (error) {
     return NextResponse.json({ error: 'Помилка' }, { status: 500 })
@@ -34,10 +37,11 @@ export async function POST(req) {
     if (!session || session.user.role !== 'client') {
       return NextResponse.json({ error: 'Тільки клієнти можуть залишати відгуки' }, { status: 403 })
     }
+    const rq = withSession(session)
 
     const { reviewedId, projectId, rating, reviewText } = await req.json()
 
-    const result = await query(
+    const result = await rq(
       `INSERT INTO Ratings (reviewer_id, reviewed_id, project_id, rating, review_text)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [session.user.profileId, reviewedId, projectId, rating, reviewText]

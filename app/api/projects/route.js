@@ -1,4 +1,4 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
@@ -6,6 +6,9 @@ import { NextResponse } from 'next/server'
 // отримати список проектів
 export async function GET(req) {
   try {
+    const session = await getServerSession(authOptions)
+    const rq = withSession(session)
+
     const { searchParams } = new URL(req.url)
     const specialization = searchParams.get('specialization')
     const minBudget = searchParams.get('minBudget')
@@ -35,7 +38,7 @@ export async function GET(req) {
 
     sql += ' ORDER BY p.created_at DESC'
 
-    const result = await query(sql, params)
+    const result = await rq(sql, params)
     return NextResponse.json(result.rows)
   } catch (error) {
     console.log('Projects GET error:', error)
@@ -50,10 +53,11 @@ export async function POST(req) {
     if (!session || session.user.role !== 'client') {
       return NextResponse.json({ error: 'Доступ заборонено' }, { status: 403 })
     }
+    const rq = withSession(session)
 
     const { description, specialization, budget, deadline } = await req.json()
 
-    const result = await query(
+    const result = await rq(
       `INSERT INTO Project (client_id, specialization, description, budget, deadline)
        VALUES ($1, $2::project_specialization, $3, $4, $5) RETURNING *`,
       [session.user.profileId, specialization, description, budget, deadline]

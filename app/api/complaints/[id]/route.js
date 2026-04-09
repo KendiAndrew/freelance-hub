@@ -1,4 +1,4 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
@@ -10,12 +10,13 @@ export async function PUT(req, { params }) {
     if (!session || session.user.role !== 'admin') {
       return NextResponse.json({ error: 'Тільки адмін' }, { status: 403 })
     }
+    const rq = withSession(session)
 
     const { id } = await params
     const { status, type } = await req.json()
 
     const table = type === 'client' ? 'ComplaintClient' : 'ComplaintContractor'
-    const result = await query(
+    const result = await rq(
       `UPDATE ${table} SET status = $1::complaint_status,
        resolved_at = CASE WHEN $1 != 'In Process' THEN CURRENT_TIMESTAMP ELSE NULL END
        WHERE complaint_id = $2 RETURNING *`,

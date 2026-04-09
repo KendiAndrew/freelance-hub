@@ -1,12 +1,16 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(req, { params }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session) return NextResponse.json({ error: 'Не авторизовано' }, { status: 401 })
+    const rq = withSession(session)
+
     const { id } = await params
-    const result = await query(
+    const result = await rq(
       `SELECT d.*, p.description AS project_desc, p.specialization, p.budget AS project_budget,
        cl.first_name || ' ' || cl.last_name AS client_name,
        co.first_name || ' ' || co.last_name AS contractor_name
@@ -21,7 +25,7 @@ export async function GET(req, { params }) {
     }
 
     // ескроу для цієї угоди
-    const escrow = await query('SELECT * FROM Safe WHERE deal_id = $1', [id])
+    const escrow = await rq('SELECT * FROM Safe WHERE deal_id = $1', [id])
 
     return NextResponse.json({ ...result.rows[0], escrow: escrow.rows })
   } catch (error) {
@@ -34,11 +38,12 @@ export async function PUT(req, { params }) {
   try {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: 'Не авторизовано' }, { status: 401 })
+    const rq = withSession(session)
 
     const { id } = await params
     const { status } = await req.json()
 
-    const result = await query(
+    const result = await rq(
       `UPDATE Deal SET status = $1::deal_status,
        completion_date = CASE WHEN $1 = 'Completed' THEN CURRENT_DATE ELSE completion_date END,
        updated_at = CURRENT_TIMESTAMP
@@ -48,7 +53,7 @@ export async function PUT(req, { params }) {
 
     // якщо завершено - виплачуємо ескроу
     if (status === 'Completed') {
-      await query(
+      await rq(
         `UPDATE Safe SET status = 'Released', release_date = CURRENT_DATE WHERE deal_id = $1 AND status = 'Frozen'`,
         [id]
       )

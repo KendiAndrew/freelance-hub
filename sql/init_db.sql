@@ -451,7 +451,7 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO freelance_admin;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO freelance_admin;
 
 -- CLIENT — CRUD свої проекти, угоди, рейтинги, скарги
-GRANT SELECT ON Users TO freelance_client;
+GRANT SELECT (user_id, login, email, role, created_at) ON Users TO freelance_client;
 GRANT SELECT, INSERT, UPDATE ON Client TO freelance_client;
 GRANT SELECT, INSERT, UPDATE, DELETE ON Project TO freelance_client;
 GRANT SELECT, INSERT, UPDATE ON Deal TO freelance_client;
@@ -460,11 +460,11 @@ GRANT SELECT ON ContractorTask TO freelance_client;
 GRANT SELECT, INSERT ON Ratings TO freelance_client;
 GRANT SELECT, INSERT ON ComplaintClient TO freelance_client;
 GRANT SELECT ON ComplaintContractor TO freelance_client;
-GRANT SELECT ON Safe TO freelance_client;
+GRANT SELECT, INSERT, UPDATE ON Safe TO freelance_client;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_client;
 
 -- CONTRACTOR — перегляд проектів, робота з завданнями
-GRANT SELECT ON Users TO freelance_contractor;
+GRANT SELECT (user_id, login, email, role, created_at) ON Users TO freelance_contractor;
 GRANT SELECT ON Client TO freelance_contractor;
 GRANT SELECT, UPDATE ON Contractor TO freelance_contractor;
 GRANT SELECT ON Project TO freelance_contractor;
@@ -473,12 +473,14 @@ GRANT SELECT, INSERT, UPDATE ON ContractorTask TO freelance_contractor;
 GRANT SELECT ON Ratings TO freelance_contractor;
 GRANT SELECT ON ComplaintClient TO freelance_contractor;
 GRANT SELECT, INSERT ON ComplaintContractor TO freelance_contractor;
-GRANT SELECT ON Safe TO freelance_contractor;
+GRANT SELECT, UPDATE ON Safe TO freelance_contractor;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_contractor;
 
 -- GUEST — тільки перегляд публічних даних
 GRANT SELECT ON Project TO freelance_guest;
-GRANT SELECT (contractor_id, first_name, last_name, specialization, city, rating) ON Contractor TO freelance_guest;
+GRANT SELECT ON Contractor TO freelance_guest;
+GRANT SELECT ON Ratings TO freelance_guest;
+GRANT SELECT (client_id, first_name, last_name, city) ON Client TO freelance_guest;
 GRANT SELECT ON top_contractors TO freelance_guest;
 GRANT SELECT ON active_projects TO freelance_guest;
 GRANT SELECT ON project_statistics TO freelance_guest;
@@ -503,7 +505,7 @@ CREATE POLICY project_modify_own ON Project
         client_id IN (
             SELECT c.client_id FROM Client c
             JOIN Users u ON c.user_id = u.user_id
-            WHERE u.login = current_user
+            WHERE u.login = current_setting('app.current_login', true)
         )
     );
 
@@ -512,8 +514,8 @@ ALTER TABLE Deal ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY deal_select_own ON Deal
     FOR SELECT USING (
-        client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_user)
-        OR contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_user)
+        client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        OR contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
         OR current_user = 'freelance_admin'
     );
 
@@ -524,8 +526,8 @@ CREATE POLICY safe_select_related ON Safe
     FOR SELECT USING (
         deal_id IN (
             SELECT d.deal_id FROM Deal d
-            WHERE d.client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_user)
-            OR d.contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_user)
+            WHERE d.client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+            OR d.contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
         )
         OR current_user = 'freelance_admin'
     );
@@ -551,10 +553,10 @@ INSERT INTO Users (login, email, password_hash, role) VALUES
 -- Клієнти
 INSERT INTO Client (user_id, first_name, last_name, photo, city, rating) VALUES
 (2, 'Іван', 'Коваль', 'ivan.jpg', 'Київ', 0),
-(3, 'Олена', 'Шевченко', 'olena.png', 'Львів', 1145),
-(4, 'Марія', 'Бондар', 'maria.jpg', 'Одеса', 2401),
-(5, 'Дмитро', 'Лисенко', 'dmytro.png', 'Дніпро', 998),
-(6, 'Наталія', 'Мороз', 'natalia.jpg', 'Харків', 3339);
+(3, 'Олена', 'Шевченко', 'olena.png', 'Львів', 72),
+(4, 'Марія', 'Бондар', 'maria.jpg', 'Одеса', 85),
+(5, 'Дмитро', 'Лисенко', 'dmytro.png', 'Дніпро', 58),
+(6, 'Наталія', 'Мороз', 'natalia.jpg', 'Харків', 91);
 
 -- Виконавці
 INSERT INTO Contractor (user_id, first_name, last_name, specialization, resume, portfolio, photo, city, rating) VALUES

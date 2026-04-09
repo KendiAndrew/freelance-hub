@@ -1,8 +1,13 @@
-import { query } from '@/lib/db'
+import { withSession } from '@/lib/db'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
 export async function GET(req) {
   try {
+    const session = await getServerSession(authOptions)
+    const rq = withSession(session)
+
     const { searchParams } = new URL(req.url)
     const specialization = searchParams.get('specialization')
     const city = searchParams.get('city')
@@ -22,7 +27,7 @@ export async function GET(req) {
 
     sql += ' ORDER BY rating DESC'
 
-    const result = await query(sql, params)
+    const result = await rq(sql, params)
     return NextResponse.json(result.rows)
   } catch (error) {
     return NextResponse.json({ error: 'Помилка' }, { status: 500 })

@@ -776,23 +776,34 @@ export const authOptions = {
 
 З текстом запитів на створення ролей та привілеїв можна ознайомитись в додатку J.
 
-Для неавторизованого доступу створено службову роль freelance_guest, від імені якої виконується перегляд публічних даних системи — каталогу проектів, профілів виконавців та загальної статистики платформи. Ця роль має мінімальний набір привілеїв (SELECT) лише на таблиці Project, обмежені стовпці таблиці Contractor та три представлення: top_contractors, active_projects та project_statistics.
+Для неавторизованого доступу створено службову роль freelance_guest, від імені якої виконується перегляд публічних даних системи — каталогу проектів, профілів виконавців, відгуків та загальної статистики платформи. Ця роль має мінімальний набір привілеїв (SELECT) на таблиці Project, Contractor, Ratings, обмежені стовпці таблиці Client (client_id, first_name, last_name, city) та три представлення: top_contractors, active_projects та project_statistics.
 
 Оскільки система побудована на основі веб-додатку Next.js, аутентифікація та авторизація користувачів реалізовано на двох рівнях: на рівні додатку (через бібліотеку NextAuth.js) та на рівні бази даних (через ролі та привілеї PostgreSQL).
 
-**Аутентифікація на рівні додатку.** При вході в систему користувач вводить логін та пароль на сторінці авторизації. Модуль lib/auth.js (див. лістинг 8.4) виконує пошук облікового запису в таблиці Users та перевірку пароля. Паролі зберігаються у базі даних у вигляді хешів, згенерованих алгоритмом bcrypt з бібліотеки bcryptjs. Алгоритм bcrypt автоматично додає сіль (salt) до кожного пароля перед хешуванням, що унеможливлює використання райдужних таблиць (rainbow tables) для зворотного відновлення паролів. Переглянути хеші паролів може тільки суперкористувач бази даних.
+**Аутентифікація на рівні додатку.** При вході в систему користувач вводить логін та пароль на сторінці авторизації. Модуль lib/auth.js (див. лістинг 8.4) виконує пошук облікового запису в таблиці Users та перевірку пароля. Аутентифікація виконується від імені суперкористувача бази даних, оскільки потребує доступу до стовпця password_hash таблиці Users. Паролі зберігаються у базі даних у вигляді хешів, згенерованих алгоритмом bcrypt з бібліотеки bcryptjs. Алгоритм bcrypt автоматично додає сіль (salt) до кожного пароля перед хешуванням, що унеможливлює використання райдужних таблиць (rainbow tables) для зворотного відновлення паролів.
+
+**Розмежування доступу до паролів.** Стовпець password_hash таблиці Users захищено на рівні бази даних за допомогою механізму стовпцевих привілеїв (column-level privileges). Ролі freelance_client та freelance_contractor мають доступ лише до стовпців user_id, login, email, role та created_at таблиці Users. Стовпець password_hash виключено з привілеїв цих ролей, тому спроба виконати SELECT password_hash FROM Users від імені замовника чи виконавця призведе до помилки доступу. Роль freelance_guest не має жодного доступу до таблиці Users. Повний доступ до стовпця password_hash має лише роль freelance_admin та суперкористувач бази даних.
 
 Після успішної перевірки пароля функція authorize() завантажує дані профілю з таблиці Client або Contractor залежно від ролі та формує об'єкт користувача з інформацією про ідентифікатор, роль та ім'я. Цей об'єкт серіалізується у JWT-токен (JSON Web Token), який зберігається у захищеному cookie браузера.
 
 **Авторизація на рівні додатку.** Визначення активної ролі користувача системи відбувається під час послідовних аутентифікації та авторизації. Як зазначено в розділі 8, всередині модуля lib/auth.js колбек jwt зберігає роль користувача у токені, а колбек session передає її в об'єкт сесії. Кожний API Route перевіряє роль через виклик функції getServerSession(authOptions) та порівнює session.user.role з дозволеними ролями для конкретної операції. Наприклад, створення проекту дозволено лише ролі client, а доступ до адмін-панелі — лише ролі admin. Якщо роль не відповідає вимогам, сервер повертає HTTP-відповідь зі статусом 403 (Доступ заборонено).
 
-**Безпека на рівні бази даних.** Додатково до авторизації на рівні додатку, в базі даних PostgreSQL налаштовано механізм Row Level Security (RLS) — безпеку на рівні рядків. RLS дозволяє обмежити доступ до окремих рядків таблиці залежно від поточної ролі підключення. Політики RLS створено для трьох таблиць:
+**Доступ до бази даних через SET ROLE.** Ключовим механізмом розмежування доступу на рівні бази даних є використання команди SET ROLE. Додаток підключається до PostgreSQL від імені суперкористувача через єдиний пул з'єднань (connection pool). Перед виконанням кожного SQL-запиту модуль lib/db.js виконує команду SET ROLE для перемикання на відповідну роль бази даних:
+
+- якщо користувач має роль admin — встановлюється SET ROLE freelance_admin;
+- якщо користувач має роль client — встановлюється SET ROLE freelance_client;
+- якщо користувач має роль contractor — встановлюється SET ROLE freelance_contractor;
+- якщо користувач не авторизований (гість) — встановлюється SET ROLE freelance_guest.
+
+Після виконання запиту з'єднання повертається до початкового стану командою RESET ROLE. Таким чином, PostgreSQL перевіряє привілеї (GRANT) та політики RLS для кожного запиту відповідно до ролі поточного користувача, а не суперкористувача.
+
+**Безпека на рівні рядків (RLS).** Додатково до привілеїв на рівні таблиць та стовпців, в базі даних PostgreSQL налаштовано механізм Row Level Security (RLS) — безпеку на рівні рядків. RLS дозволяє обмежити доступ до окремих рядків таблиці залежно від поточної ролі підключення. Політики RLS створено для трьох таблиць:
 
 - **Project** — перегляд дозволено всім ролям (політика project_select_all), а модифікація (створення, оновлення, видалення) — лише замовнику, який є власником проекту (політика project_modify_own);
 - **Deal** — перегляд дозволено лише учасникам угоди (замовнику або виконавцю) та адміністратору (політика deal_select_own);
 - **Safe** — перегляд ескроу-рахунку дозволено лише учасникам пов'язаної угоди та адміністратору (політика safe_select_related).
 
-Після вдалої авторизації користувач може вільно взаємодіяти з графічним інтерфейсом системи у обсязі, який обмежують права активної ролі. На рівні додатку перевіряється роль з JWT-токена, на рівні бази даних — привілеї рольової групи та політики RLS.
+Таким чином, доступ до даних системи контролюється на трьох рівнях: авторизація на рівні додатку (перевірка ролі з JWT-токена), привілеї на рівні бази даних (GRANT на таблиці та стовпці, зокрема захист password_hash) та політики RLS (обмеження доступу до конкретних рядків залежно від ролі).
 
 ## 10 ІНСТРУКЦІЯ КОРИСТУВАЧА
 
@@ -1843,16 +1854,16 @@ EXECUTE FUNCTION update_client_rating();
 | Об'єкт БД | Адміністратор (freelance_admin) | Замовник (freelance_client) | Виконавець (freelance_contractor) | Гість (freelance_guest) |
 |---|---|---|---|---|
 | **Таблиці** | | | | |
-| Users | CRUD | R | R | — |
-| Client | CRUD | RU* | R | — |
-| Contractor | CRUD | R | RU* | R (обмежені стовпці) |
+| Users | CRUD | R (без password_hash)** | R (без password_hash)** | — |
+| Client | CRUD | RU* | R | R (обмежені стовпці)** |
+| Contractor | CRUD | R | RU* | R |
 | Project | CRUD | CRUD* | R | R |
 | Deal | CRUD | CRU | RU | — |
 | ContractorTask | CRUD | R | CRU | — |
-| Ratings | CRUD | CR | R | — |
+| Ratings | CRUD | CR | R | R |
 | ComplaintClient | CRUD | CR | R | — |
 | ComplaintContractor | CRUD | R | CR | — |
-| Safe | CRUD | R | R | — |
+| Safe | CRUD | CRU | RU | — |
 | **Представлення** | | | | |
 | top_contractors | R | R | R | R |
 | active_projects | R | R | R | R |
@@ -1861,6 +1872,8 @@ EXECUTE FUNCTION update_client_rating();
 | ALL SEQUENCES | CRUD | USAGE | USAGE | — |
 
 \* Позначені привілеї обмежено політиками RLS — операції модифікації дозволено лише для власних записів.
+
+\*\* Стовпцевий доступ (column-level privileges): для ролей freelance_client та freelance_contractor дозволено SELECT лише на стовпці user_id, login, email, role, created_at таблиці Users (стовпець password_hash виключено). Для ролі freelance_guest дозволено SELECT лише на стовпці client_id, first_name, last_name, city таблиці Client.
 
 Умовні позначення: C — INSERT (створення), R — SELECT (читання), U — UPDATE (оновлення), D — DELETE (видалення).
 
@@ -1904,7 +1917,8 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public
 
 ```sql
 -- CLIENT — CRUD свої проекти, угоди, рейтинги, скарги
-GRANT SELECT ON Users TO freelance_client;
+GRANT SELECT (user_id, login, email, role, created_at)
+    ON Users TO freelance_client;
 GRANT SELECT, INSERT, UPDATE ON Client TO freelance_client;
 GRANT SELECT, INSERT, UPDATE, DELETE ON Project TO freelance_client;
 GRANT SELECT, INSERT, UPDATE ON Deal TO freelance_client;
@@ -1913,7 +1927,7 @@ GRANT SELECT ON ContractorTask TO freelance_client;
 GRANT SELECT, INSERT ON Ratings TO freelance_client;
 GRANT SELECT, INSERT ON ComplaintClient TO freelance_client;
 GRANT SELECT ON ComplaintContractor TO freelance_client;
-GRANT SELECT ON Safe TO freelance_client;
+GRANT SELECT, INSERT, UPDATE ON Safe TO freelance_client;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_client;
 ```
 
@@ -1921,7 +1935,8 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_client;
 
 ```sql
 -- CONTRACTOR — перегляд проектів, робота з завданнями
-GRANT SELECT ON Users TO freelance_contractor;
+GRANT SELECT (user_id, login, email, role, created_at)
+    ON Users TO freelance_contractor;
 GRANT SELECT ON Client TO freelance_contractor;
 GRANT SELECT, UPDATE ON Contractor TO freelance_contractor;
 GRANT SELECT ON Project TO freelance_contractor;
@@ -1930,7 +1945,7 @@ GRANT SELECT, INSERT, UPDATE ON ContractorTask TO freelance_contractor;
 GRANT SELECT ON Ratings TO freelance_contractor;
 GRANT SELECT ON ComplaintClient TO freelance_contractor;
 GRANT SELECT, INSERT ON ComplaintContractor TO freelance_contractor;
-GRANT SELECT ON Safe TO freelance_contractor;
+GRANT SELECT, UPDATE ON Safe TO freelance_contractor;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_contractor;
 ```
 
@@ -1939,8 +1954,10 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO freelance_contractor;
 ```sql
 -- GUEST — тільки перегляд публічних даних
 GRANT SELECT ON Project TO freelance_guest;
-GRANT SELECT (contractor_id, first_name, last_name,
-    specialization, city, rating) ON Contractor TO freelance_guest;
+GRANT SELECT ON Contractor TO freelance_guest;
+GRANT SELECT ON Ratings TO freelance_guest;
+GRANT SELECT (client_id, first_name, last_name, city)
+    ON Client TO freelance_guest;
 GRANT SELECT ON top_contractors TO freelance_guest;
 GRANT SELECT ON active_projects TO freelance_guest;
 GRANT SELECT ON project_statistics TO freelance_guest;
@@ -1971,7 +1988,8 @@ CREATE POLICY project_modify_own ON Project
         client_id IN (
             SELECT c.client_id FROM Client c
             JOIN Users u ON c.user_id = u.user_id
-            WHERE u.login = current_user
+            WHERE u.login = current_setting(
+                'app.current_login', true)
         )
     );
 
@@ -1983,11 +2001,13 @@ CREATE POLICY deal_select_own ON Deal
         client_id IN (
             SELECT c.client_id FROM Client c
             JOIN Users u ON c.user_id = u.user_id
-            WHERE u.login = current_user)
+            WHERE u.login = current_setting(
+                'app.current_login', true))
         OR contractor_id IN (
             SELECT co.contractor_id FROM Contractor co
             JOIN Users u ON co.user_id = u.user_id
-            WHERE u.login = current_user)
+            WHERE u.login = current_setting(
+                'app.current_login', true))
         OR current_user = 'freelance_admin'
     );
 
@@ -2001,11 +2021,13 @@ CREATE POLICY safe_select_related ON Safe
             WHERE d.client_id IN (
                 SELECT c.client_id FROM Client c
                 JOIN Users u ON c.user_id = u.user_id
-                WHERE u.login = current_user)
+                WHERE u.login = current_setting(
+                    'app.current_login', true))
             OR d.contractor_id IN (
                 SELECT co.contractor_id FROM Contractor co
                 JOIN Users u ON co.user_id = u.user_id
-                WHERE u.login = current_user)
+                WHERE u.login = current_setting(
+                    'app.current_login', true))
         )
         OR current_user = 'freelance_admin'
     );
