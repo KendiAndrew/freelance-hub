@@ -8,6 +8,8 @@ DROP TRIGGER IF EXISTS trg_update_contractor_rating ON Ratings;
 DROP TRIGGER IF EXISTS trg_update_client_rating ON Ratings;
 DROP TRIGGER IF EXISTS before_insert_new_deal ON Deal;
 
+DROP FUNCTION IF EXISTS authenticate(TEXT, TEXT);
+DROP FUNCTION IF EXISTS create_user_role(TEXT, TEXT, TEXT);
 DROP FUNCTION IF EXISTS update_contractor_rating();
 DROP FUNCTION IF EXISTS update_client_rating();
 DROP FUNCTION IF EXISTS check_contractor_unfinished_deals();
@@ -70,12 +72,11 @@ CREATE TYPE user_role AS ENUM (
 -- ТАБЛИЦІ
 -- =====================================================
 
--- Таблиця користувачів (для авторизації)
+-- Таблиця користувачів (облікові записи без паролів — автентифікація через PostgreSQL)
 CREATE TABLE Users (
     user_id SERIAL PRIMARY KEY,
     login user_login UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
     role user_role NOT NULL DEFAULT 'client',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -284,6 +285,20 @@ GROUP BY p.specialization;
 -- ФУНКЦІЇ
 -- =====================================================
 
+-- Створення індивідуальної PostgreSQL-ролі для нового користувача
+-- Викликається при реєстрації; пароль зберігається в pg_authid (не в таблиці Users)
+CREATE OR REPLACE FUNCTION create_user_role(p_login TEXT, p_password TEXT, p_group_role TEXT)
+RETURNS VOID
+SECURITY DEFINER
+AS $$
+BEGIN
+    EXECUTE format(
+        'CREATE ROLE %I WITH LOGIN PASSWORD %L IN ROLE %I',
+        p_login, p_password, p_group_role
+    );
+END;
+$$ LANGUAGE plpgsql;
+
 -- Оновлення рейтингу виконавця (автоматично після відгуку)
 CREATE OR REPLACE FUNCTION update_contractor_rating()
 RETURNS TRIGGER AS $$
@@ -413,26 +428,40 @@ EXECUTE FUNCTION update_client_rating();
 
 -- Видалення старих ролей (якщо є)
 DO $$
+DECLARE
+    v_login TEXT;
+    v_logins TEXT[] := ARRAY[
+        'admin', 'ivan_koval', 'olena_shevch', 'maria_bondar',
+        'dmytro_lysen', 'natalia_moroz', 'dev_andriy', 'designer_max',
+        'writer_svit', 'marketing_tar', 'frontend_oks'
+    ];
 BEGIN
-    -- Відкликання привілеїв перед видаленням
+    -- Видалення індивідуальних login-ролей тестових користувачів
+    FOREACH v_login IN ARRAY v_logins LOOP
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = v_login) THEN
+            EXECUTE format('DROP ROLE %I', v_login);
+        END IF;
+    END LOOP;
+
+    -- Відкликання привілеїв та видалення групових ролей
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'freelance_admin') THEN
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM freelance_admin;
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM freelance_admin;
+        REASSIGN OWNED BY freelance_admin TO postgres;
+        DROP OWNED BY freelance_admin;
         DROP ROLE freelance_admin;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'freelance_client') THEN
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM freelance_client;
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM freelance_client;
+        REASSIGN OWNED BY freelance_client TO postgres;
+        DROP OWNED BY freelance_client;
         DROP ROLE freelance_client;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'freelance_contractor') THEN
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM freelance_contractor;
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM freelance_contractor;
+        REASSIGN OWNED BY freelance_contractor TO postgres;
+        DROP OWNED BY freelance_contractor;
         DROP ROLE freelance_contractor;
     END IF;
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'freelance_guest') THEN
-        REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM freelance_guest;
-        REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM freelance_guest;
+        REASSIGN OWNED BY freelance_guest TO postgres;
+        DROP OWNED BY freelance_guest;
         DROP ROLE freelance_guest;
     END IF;
 END $$;
@@ -491,6 +520,29 @@ GRANT SELECT ON active_projects TO freelance_client, freelance_contractor;
 GRANT SELECT ON project_statistics TO freelance_admin;
 
 -- =====================================================
+-- ІНДИВІДУАЛЬНІ LOGIN-РОЛІ (автентифікація через PostgreSQL)
+-- Паролі зберігаються в системному каталозі pg_authid, НЕ в таблиці Users
+-- Кожен користувач є членом відповідної групової ролі
+-- =====================================================
+
+-- Адміністратор
+CREATE ROLE admin WITH LOGIN PASSWORD 'password123' IN ROLE freelance_admin;
+
+-- Замовники (client)
+CREATE ROLE ivan_koval    WITH LOGIN PASSWORD 'password123' IN ROLE freelance_client;
+CREATE ROLE olena_shevch  WITH LOGIN PASSWORD 'password123' IN ROLE freelance_client;
+CREATE ROLE maria_bondar  WITH LOGIN PASSWORD 'password123' IN ROLE freelance_client;
+CREATE ROLE dmytro_lysen  WITH LOGIN PASSWORD 'password123' IN ROLE freelance_client;
+CREATE ROLE natalia_moroz WITH LOGIN PASSWORD 'password123' IN ROLE freelance_client;
+
+-- Виконавці (contractor)
+CREATE ROLE dev_andriy     WITH LOGIN PASSWORD 'password123' IN ROLE freelance_contractor;
+CREATE ROLE designer_max   WITH LOGIN PASSWORD 'password123' IN ROLE freelance_contractor;
+CREATE ROLE writer_svit    WITH LOGIN PASSWORD 'password123' IN ROLE freelance_contractor;
+CREATE ROLE marketing_tar  WITH LOGIN PASSWORD 'password123' IN ROLE freelance_contractor;
+CREATE ROLE frontend_oks   WITH LOGIN PASSWORD 'password123' IN ROLE freelance_contractor;
+
+-- =====================================================
 -- ROW LEVEL SECURITY (RLS)
 -- =====================================================
 
@@ -536,19 +588,19 @@ CREATE POLICY safe_select_related ON Safe
 -- ТЕСТОВІ ДАНІ
 -- =====================================================
 
--- Тестові користувачі (пароль для всіх: password123)
-INSERT INTO Users (login, email, password_hash, role) VALUES
-('admin', 'admin@freelance.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'admin'),
-('ivan_koval', 'ivan.koval@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'client'),
-('olena_shevch', 'olena.shevchenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'client'),
-('maria_bondar', 'maria.bondar@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'client'),
-('dmytro_lysen', 'dmytro.lysenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'client'),
-('natalia_moroz', 'natalia.moroz@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'client'),
-('dev_andriy', 'andriy.melnyk@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'contractor'),
-('designer_max', 'maxym.kovalenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'contractor'),
-('writer_svit', 'svitlana.petrenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'contractor'),
-('marketing_tar', 'taras.grytsenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'contractor'),
-('frontend_oks', 'oksana.tkachenko@example.ua', '$2b$10$NdqGMPFxsvCLuMTRAo.JVOFF3MQdHvWQ84zSnWIAQbX5OjUj1Bw6i', 'contractor');
+-- Тестові користувачі (паролі зберігаються в pg_authid через LOGIN-ролі, не тут)
+INSERT INTO Users (login, email, role) VALUES
+('admin',        'admin@freelance.ua',              'admin'),
+('ivan_koval',   'ivan.koval@example.ua',           'client'),
+('olena_shevch', 'olena.shevchenko@example.ua',     'client'),
+('maria_bondar', 'maria.bondar@example.ua',         'client'),
+('dmytro_lysen', 'dmytro.lysenko@example.ua',       'client'),
+('natalia_moroz','natalia.moroz@example.ua',        'client'),
+('dev_andriy',   'andriy.melnyk@example.ua',        'contractor'),
+('designer_max', 'maxym.kovalenko@example.ua',      'contractor'),
+('writer_svit',  'svitlana.petrenko@example.ua',    'contractor'),
+('marketing_tar','taras.grytsenko@example.ua',      'contractor'),
+('frontend_oks', 'oksana.tkachenko@example.ua',     'contractor');
 
 -- Клієнти
 INSERT INTO Client (user_id, first_name, last_name, photo, city, rating) VALUES
