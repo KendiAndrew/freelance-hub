@@ -12,54 +12,80 @@
 
 ## Вимоги
 
+- **Git**
 - **Node.js** 18.18 або новіше
 - **PostgreSQL** 15 або новіше
 
-## Встановлення та запуск
+## Покрокова інструкція встановлення з нуля
 
-### 1. Встановити залежності
+### Крок 1 — Встановити Git
+
+1. Перейти на [git-scm.com/download/win](https://git-scm.com/download/win)
+2. Завантажити і запустити інсталятор
+3. Всі налаштування залишити за замовчуванням → натискати "Next" → "Install"
+4. Після встановлення **закрити і відкрити PowerShell заново**
+5. Перевірити: `git --version` — має вивести версію
+
+### Крок 2 — Встановити Node.js
+
+1. Перейти на [nodejs.org](https://nodejs.org) → завантажити версію **LTS**
+2. Запустити інсталятор, всі налаштування за замовчуванням
+3. Після встановлення **закрити і відкрити PowerShell заново**
+4. Перевірити: `node --version` — має вивести 18.x або вище
+
+### Крок 3 — Встановити PostgreSQL
+
+1. Перейти на [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) → "Download the installer"
+2. Завантажити версію **17** або новіше
+3. Запустити інсталятор:
+   - Password: придумати пароль для користувача `postgres` (запам'ятати!)
+   - Port: `5432` (за замовчуванням)
+   - Locale: залишити за замовчуванням
+4. **Stack Builder** в кінці — можна скасувати
+5. Додати PostgreSQL до PATH: під час встановлення поставити галочку або вручну додати `C:\Program Files\PostgreSQL\17\bin` до змінної PATH
+6. Перевірити: `psql --version`
+
+### Крок 4 — Клонувати репозиторій
+
+```bash
+git clone https://github.com/KendiAndrew/freelance-hub.git
+cd freelance-hub
+```
+
+### Крок 5 — Встановити залежності
 
 ```bash
 npm install
 ```
 
-### 2. Налаштувати змінні оточення
+### Крок 6 — Налаштувати змінні оточення
 
-Скопіюйте `.env.example` у `.env.local`:
+Скопіювати файл `.env.example` у `.env.local`:
 
-- **Windows**: `copy .env.example .env.local`
-- **macOS/Linux**: `cp .env.example .env.local`
+```bash
+copy .env.example .env.local
+```
 
-Заповніть `.env.local`:
+Відкрити `.env.local` у блокноті і замінити `YOUR_PASSWORD` на пароль PostgreSQL з Кроку 3:
 
 ```
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/freelance_db
-NEXTAUTH_SECRET=your_secret_key_here
+NEXTAUTH_SECRET=supersecretkey123
 NEXTAUTH_URL=http://localhost:3000
 ```
 
-> **Підказка**: `NEXTAUTH_SECRET` — будь-який випадковий рядок. Згенерувати:
-> ```bash
-> node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-> ```
-
-> **Важливо**: `DATABASE_URL` має використовувати суперкористувача PostgreSQL (`postgres`), бо backend виконує `SET ROLE` для перемикання між ролями.
-
-### 3. Налаштувати PostgreSQL
-
-Переконайтесь, що PostgreSQL запущений. Створіть базу та виконайте ініціалізацію:
+### Крок 7 — Створити базу даних
 
 ```bash
 psql -h localhost -U postgres -c "CREATE DATABASE freelance_db;"
 psql -h localhost -U postgres -d freelance_db -f sql/init_db.sql
 ```
 
-`init_db.sql` автоматично:
-- створює схему (таблиці, типи, домени)
-- створює 4 PostgreSQL-ролі з привілеями та RLS
-- наповнює базу тестовими даними
+> При виконанні psql запитає пароль — ввести пароль з Кроку 3.
 
-### 4. Запустити
+`init_db.sql` автоматично створює таблиці, ролі та наповнює базу тестовими даними.
+
+### Крок 8 — Запустити
 
 ```bash
 npm run dev
