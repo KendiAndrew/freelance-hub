@@ -100,9 +100,12 @@ export default function AdminPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-gray-200">
-                    {Object.keys(stats.projectStats[0]).map(key => (
-                      <th key={key} className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">{key}</th>
-                    ))}
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Спеціалізація</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Проектів</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Сер. бюджет</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Завершено</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">В роботі</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-600 text-sm">Очікує</th>
                   </tr>
                 </thead>
                 <tbody>

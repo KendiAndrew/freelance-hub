@@ -87,13 +87,13 @@ export default function DealsPage() {
                 </div>
                 <div className="text-right flex flex-col justify-between">
                   <div className="text-2xl font-bold text-indigo-600 mb-2">{Number(deal.amount).toLocaleString()} грн</div>
-                  {deal.status === 'Pending' && (
+                  {session?.user?.role === 'client' && deal.status === 'Pending' && (
                     <div className="flex gap-2">
                       <button onClick={() => updateStatus(deal.deal_id, 'In Progress')} className="btn-primary text-sm py-1 px-3">Прийняти</button>
                       <button onClick={() => updateStatus(deal.deal_id, 'Cancelled')} className="btn-danger text-sm py-1 px-3">Скасувати</button>
                     </div>
                   )}
-                  {deal.status === 'In Progress' && (
+                  {session?.user?.role === 'client' && deal.status === 'In Progress' && (
                     <button onClick={() => updateStatus(deal.deal_id, 'Completed')} className="btn-primary text-sm py-1 px-3">Завершити</button>
                   )}
                 </div>

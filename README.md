@@ -10,63 +10,89 @@
 - **Авторизація**: NextAuth.js (Credentials, JWT) — автентифікація через PostgreSQL-ролі
 - **DB access**: pg (node-postgres), параметризовані SQL-запити
 
-## Вимоги
+## Вимоги до системи
 
-- **Git**
-- **Node.js** 18.18 або новіше
-- **PostgreSQL** 15 або новіше
+| Програма | Мінімальна версія | Рекомендована |
+|----------|-------------------|---------------|
+| Git | 2.x | остання |
+| Node.js | 18.18 | 20 LTS або 22 LTS |
+| PostgreSQL | 15 | 15, 16, 17 |
+| npm | 9.x | входить у Node.js |
 
-## Покрокова інструкція встановлення з нуля
+> **Увага:** дамп БД (`freelance_db_dump.sql`) сумісний з PostgreSQL 15+.
+
+---
+
+## Покрокова інструкція встановлення (Windows)
 
 ### Крок 1 — Встановити Git
 
 1. Перейти на [git-scm.com/download/win](https://git-scm.com/download/win)
-2. Завантажити і запустити інсталятор
-3. Всі налаштування залишити за замовчуванням → натискати "Next" → "Install"
+2. Завантажити і запустити інсталятор (64-bit)
+3. Усі налаштування залишити за замовчуванням → натискати **Next** → **Install**
 4. Після встановлення **закрити і відкрити PowerShell заново**
-5. Перевірити: `git --version` — має вивести версію
+5. Перевірити:
+   ```powershell
+   git --version
+   # Очікуваний результат: git version 2.x.x
+   ```
 
 ### Крок 2 — Встановити Node.js
 
-1. Перейти на [nodejs.org](https://nodejs.org) → завантажити версію **LTS**
-2. Запустити інсталятор, всі налаштування за замовчуванням
+1. Перейти на [nodejs.org](https://nodejs.org) → завантажити версію **LTS** (20 або 22)
+2. Запустити інсталятор, усі налаштування за замовчуванням
 3. Після встановлення **закрити і відкрити PowerShell заново**
-4. Перевірити: `node --version` — має вивести 18.x або вище
+4. Перевірити:
+   ```powershell
+   node --version
+   # Очікуваний результат: v20.x.x або v22.x.x
+   npm --version
+   # Очікуваний результат: 10.x.x
+   ```
 
 ### Крок 3 — Встановити PostgreSQL
 
-1. Перейти на [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) → "Download the installer"
-2. Завантажити версію **17** або новіше
+1. Перейти на [postgresql.org/download/windows](https://www.postgresql.org/download/windows/) → **Download the installer**
+2. Завантажити версію **15, 16 або 17** (рекомендовано 17)
 3. Запустити інсталятор:
-   - Password: придумати пароль для користувача `postgres` (запам'ятати!)
-   - Port: `5432` (за замовчуванням)
-   - Locale: залишити за замовчуванням
-4. **Stack Builder** в кінці — можна скасувати
-5. Додати PostgreSQL до PATH: під час встановлення поставити галочку або вручну додати `C:\Program Files\PostgreSQL\17\bin` до змінної PATH
-6. Перевірити: `psql --version`
+   - **Password**: придумати пароль для користувача `postgres` — **запам'ятати, він знадобиться далі!**
+   - **Port**: `5432` (за замовчуванням, не змінювати)
+   - **Locale**: залишити за замовчуванням
+4. **Stack Builder** в кінці — натиснути **Skip** або **Cancel**
+5. Після встановлення **закрити і відкрити PowerShell заново**
+6. Перевірити:
+   ```powershell
+   psql --version
+   # Очікуваний результат: psql (PostgreSQL) 17.x
+   ```
+
+> Якщо `psql` не знаходиться — додайте PostgreSQL до PATH вручну:
+> **Параметри Windows** → **Система** → **Про систему** → **Додаткові параметри системи** → **Змінні середовища** → у розділі **Системні змінні** знайти `Path` → **Змінити** → додати рядок `C:\Program Files\PostgreSQL\17\bin` (замінити `17` на вашу версію).
 
 ### Крок 4 — Клонувати репозиторій
 
-```bash
+```powershell
 git clone https://github.com/KendiAndrew/freelance-hub.git
 cd freelance-hub
 ```
 
-### Крок 5 — Встановити залежності
+### Крок 5 — Встановити залежності Node.js
 
-```bash
+```powershell
 npm install
 ```
 
-### Крок 6 — Налаштувати змінні оточення
+> Очікуваний результат: `added X packages` без критичних помилок.
+
+### Крок 6 — Налаштувати змінні середовища
 
 Скопіювати файл `.env.example` у `.env.local`:
 
-```bash
+```powershell
 copy .env.example .env.local
 ```
 
-Відкрити `.env.local` у блокноті і замінити `YOUR_PASSWORD` на пароль PostgreSQL з Кроку 3:
+Відкрити `.env.local` у будь-якому текстовому редакторі та замінити `YOUR_PASSWORD` на пароль PostgreSQL з Кроку 3:
 
 ```
 DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/freelance_db
@@ -74,36 +100,69 @@ NEXTAUTH_SECRET=supersecretkey123
 NEXTAUTH_URL=http://localhost:3000
 ```
 
-### Крок 7 — Створити базу даних
+> **Приклад** (якщо пароль `mypassword123`):
+> `DATABASE_URL=postgresql://postgres:mypassword123@localhost:5432/freelance_db`
 
-```bash
-psql -h localhost -U postgres -c "CREATE DATABASE freelance_db;"
-psql -h localhost -U postgres -d freelance_db -f sql/init_db.sql
+### Крок 7 — Створити та наповнити базу даних
+
+Відкрити PowerShell у папці проекту і виконати команди по черзі.
+
+**7.1 — Перевірити що PostgreSQL запущений:**
+
+```powershell
+psql -h localhost -U postgres -c "SELECT version();"
 ```
 
-> При виконанні psql запитає пароль — ввести пароль з Кроку 3.
+> Введіть пароль з Кроку 3. Якщо з'явилась помилка `connection refused` — PostgreSQL не запущений. Відкрийте **Services** (Win+R → `services.msc`) і запустіть службу `postgresql-x64-XX`.
 
-`init_db.sql` автоматично створює таблиці, ролі та наповнює базу тестовими даними.
+**7.2 — Створити базу даних:**
 
-### Крок 8 — Запустити
+```powershell
+psql -h localhost -U postgres -c "CREATE DATABASE freelance_db;"
+```
 
-```bash
+**7.3 — Встановити кодування та завантажити дамп:**
+
+```powershell
+$env:PGCLIENTENCODING = "UTF8"
+psql -h localhost -U postgres -d freelance_db -f sql/freelance_db_dump.sql
+```
+
+> **Важливо:** команда `$env:PGCLIENTENCODING = "UTF8"` встановлює кодування для поточного сеансу PowerShell — це **обов'язково** для коректного відображення кириличних символів. Виконуйте обидві команди в одному вікні PowerShell без закриття.
+
+**7.4 — Перевірити що дані завантажились:**
+
+```powershell
+psql -h localhost -U postgres -d freelance_db -c "SELECT login, role FROM users;"
+```
+
+> Має вивести список з 11 користувачів.
+
+### Крок 8 — Запустити додаток
+
+```powershell
 npm run dev
 ```
 
-Відкрити [http://localhost:3000](http://localhost:3000)
+Відкрити у браузері: [http://localhost:3000](http://localhost:3000)
+
+> Якщо порт 3000 зайнятий — Next.js автоматично використає 3001. У такому разі оновіть `NEXTAUTH_URL=http://localhost:3001` у `.env.local` і перезапустіть `npm run dev`.
+
+---
 
 ## Тестові акаунти
 
-Пароль для всіх: `password123`
+Пароль для всіх: **`password123`**
 
-| Логін | Роль |
-|-------|------|
-| admin | Адміністратор |
-| ivan_koval | Замовник |
-| olena_shevch | Замовник |
-| dev_andriy | Виконавець |
-| designer_max | Виконавець |
+| Логін | Роль | Повне ім'я |
+|-------|------|------------|
+| `admin` | Адміністратор | — |
+| `ivan_koval` | Замовник | Іван Коваль |
+| `olena_shevch` | Замовник | Олена Шевченко |
+| `dev_andriy` | Виконавець | Андрій Мельник |
+| `designer_max` | Виконавець | Максим Коваленко |
+
+---
 
 ## Архітектура безпеки
 
@@ -112,15 +171,16 @@ npm run dev
 - При логіні backend підключається до PostgreSQL **від імені користувача** з наданим паролем
 - PostgreSQL сам перевіряє пароль — при невірному підключення відхиляється
 - При успіху створюється JWT-сесія (NextAuth)
-- Для запитів до БД використовується `SET ROLE` — кожен запит виконується з привілеями відповідної ролі (`freelance_admin`, `freelance_client`, `freelance_contractor`, `freelance_guest`)
-- Паролі не зберігаються в таблиці `Users` — лише в системному каталозі PostgreSQL (`pg_authid`)
+- Для запитів до БД використовується `SET ROLE` — кожен запит виконується з привілеями відповідної ролі
 
-| Роль PostgreSQL | Пароль | Привілеї |
-|---|---|---|
-| `freelance_admin` | `admin_pass123` | Повний доступ |
-| `freelance_client` | `client_pass123` | CRUD проекти, угоди, відгуки |
-| `freelance_contractor` | `contractor_pass123` | Перегляд проектів, завдання, угоди |
-| `freelance_guest` | `guest_pass123` | SELECT публічний каталог |
+| Роль PostgreSQL | Привілеї |
+|----------------|----------|
+| `freelance_admin` | Повний доступ |
+| `freelance_client` | CRUD проекти, угоди, відгуки |
+| `freelance_contractor` | Перегляд проектів, завдання, угоди |
+| `freelance_guest` | SELECT публічний каталог |
+
+---
 
 ## Структура проекту
 
@@ -139,9 +199,9 @@ npm run dev
 ├── components/           # React-компоненти (Navbar)
 ├── lib/                  # Утиліти (db.js, auth.js)
 ├── sql/
-│   ├── init_db.sql       # Схема БД + ролі + тестові дані
-│   └── freelance_db_dump.sql  # Резервна копія БД
-├── docs/                 # Документація (пояснювальна записка, ER-діаграма)
+│   ├── init_db.sql            # Схема БД + ролі + тестові дані (з нуля)
+│   └── freelance_db_dump.sql  # Повний дамп БД з поточними даними
+├── docs/                 # Документація (ER-діаграма)
 └── tests/                # E2E тести (Playwright)
 ```
 
@@ -153,3 +213,20 @@ npm run dev
 - 4 ролі з RLS (Row Level Security)
 
 ER-діаграма: `docs/er-diagram.png`
+
+---
+
+## Типові помилки
+
+**`psql: command not found`** — PostgreSQL не додано до PATH. Виконайте Крок 3 або вказуйте повний шлях: `& "C:\Program Files\PostgreSQL\17\bin\psql.exe"`.
+
+**`password authentication failed`** — невірний пароль. Переконайтесь що використовуєте пароль з Кроку 3.
+
+**`database "freelance_db" already exists`** — база вже існує. Можна продовжити або видалити:
+```powershell
+psql -h localhost -U postgres -c "DROP DATABASE freelance_db;"
+```
+
+**Кирилиця відображається некоректно у psql** — це особливість відображення у PowerShell, дані в БД зберігаються коректно. Перевірте через браузер на [http://localhost:3000](http://localhost:3000).
+
+**`Port 3000 is in use`** — змініть `NEXTAUTH_URL=http://localhost:3001` у `.env.local` та перезапустіть сервер.
