@@ -20,20 +20,15 @@ export async function GET(req, { params }) {
        LEFT JOIN Contractor co ON d.contractor_id = co.contractor_id
        WHERE d.deal_id = $1`, [id]
     )
-    if (result.rows.length === 0) {
-      return NextResponse.json({ error: 'Угоду не знайдено' }, { status: 404 })
-    }
+    if (result.rows.length === 0) return NextResponse.json({ error: 'Угоду не знайдено' }, { status: 404 })
 
-    // ескроу для цієї угоди
     const escrow = await rq('SELECT * FROM Safe WHERE deal_id = $1', [id])
-
     return NextResponse.json({ ...result.rows[0], escrow: escrow.rows })
   } catch (error) {
     return NextResponse.json({ error: 'Помилка' }, { status: 500 })
   }
 }
 
-// оновити статус угоди
 export async function PUT(req, { params }) {
   try {
     const session = await getServerSession(authOptions)
@@ -43,6 +38,26 @@ export async function PUT(req, { params }) {
     const { id } = await params
     const { status } = await req.json()
 
+    // отримуємо поточну угоду
+    const dealRes = await rq('SELECT * FROM Deal WHERE deal_id = $1', [id])
+    if (dealRes.rows.length === 0) return NextResponse.json({ error: 'Угоду не знайдено' }, { status: 404 })
+    const deal = dealRes.rows[0]
+
+    // при прийнятті заявки (Pending → In Progress): скасовуємо інші заявки та створюємо ескроу
+    if (status === 'In Progress' && deal.status === 'Pending') {
+      await rq(
+        `UPDATE Deal SET status = 'Cancelled', updated_at = CURRENT_TIMESTAMP
+         WHERE project_id = $1 AND deal_id != $2 AND status = 'Pending'`,
+        [deal.project_id, id]
+      )
+
+      // створюємо ескроу якщо його ще немає
+      const existingSafe = await rq('SELECT safe_id FROM Safe WHERE deal_id = $1', [id])
+      if (existingSafe.rows.length === 0) {
+        await rq('INSERT INTO Safe (deal_id, amount) VALUES ($1, $2)', [id, deal.amount])
+      }
+    }
+
     const result = await rq(
       `UPDATE Deal SET status = $1::deal_status,
        completion_date = CASE WHEN $1 = 'Completed' THEN CURRENT_DATE ELSE completion_date END,
@@ -51,7 +66,6 @@ export async function PUT(req, { params }) {
       [status, id]
     )
 
-    // якщо завершено - виплачуємо ескроу
     if (status === 'Completed') {
       await rq(
         `UPDATE Safe SET status = 'Released', release_date = CURRENT_DATE WHERE deal_id = $1 AND status = 'Frozen'`,
@@ -59,7 +73,12 @@ export async function PUT(req, { params }) {
       )
     }
 
-    return NextResponse.json(result.rows[0])
+    // Serialize the row to handle BigInt / Decimal types
+    const row = result.rows[0]
+    const serialized = JSON.parse(JSON.stringify(row, (key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ))
+    return NextResponse.json(serialized)
   } catch (error) {
     return NextResponse.json({ error: 'Помилка' }, { status: 500 })
   }

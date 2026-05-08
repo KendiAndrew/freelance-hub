@@ -20,7 +20,7 @@ export default function ProjectsPage() {
 
     const res = await fetch(url)
     const data = await res.json()
-    setProjects(data)
+    setProjects(Array.isArray(data) ? data : [])
     setLoading(false)
   }
 

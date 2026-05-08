@@ -1,4 +1,10 @@
+'use client'
+
+import { useSession } from 'next-auth/react'
+
 export default function Home() {
+  const { data: session } = useSession()
+
   return (
     <div>
       {/* hero */}
@@ -17,9 +23,11 @@ export default function Home() {
             <a href="/projects" className="bg-white text-indigo-600 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition shadow-lg">
               Переглянути проекти
             </a>
-            <a href="/register" className="border-2 border-white text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition">
-              Зареєструватися
-            </a>
+            {!session && (
+              <a href="/register" className="border-2 border-white text-white px-8 py-3 rounded-xl font-bold hover:bg-white/10 transition">
+                Зареєструватися
+              </a>
+            )}
           </div>
         </div>
       </div>

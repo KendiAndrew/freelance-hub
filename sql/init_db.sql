@@ -4,6 +4,8 @@
 -- PostgreSQL 15+
 -- =====================================================
 
+SET client_encoding = 'UTF8';
+
 -- Видалення існуючих обʼєктів
 DROP TRIGGER IF EXISTS trg_update_contractor_rating ON Ratings;
 DROP TRIGGER IF EXISTS trg_update_client_rating ON Ratings;
@@ -572,11 +574,45 @@ CREATE POLICY deal_select_own ON Deal
         OR current_user = 'freelance_admin'
     );
 
+CREATE POLICY deal_insert_own ON Deal
+    FOR INSERT WITH CHECK (
+        client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        OR contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        OR current_user = 'freelance_admin'
+    );
+
+CREATE POLICY deal_update_own ON Deal
+    FOR UPDATE USING (
+        client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        OR contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        OR current_user = 'freelance_admin'
+    );
+
 -- RLS для Safe
 ALTER TABLE Safe ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY safe_select_related ON Safe
     FOR SELECT USING (
+        deal_id IN (
+            SELECT d.deal_id FROM Deal d
+            WHERE d.client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+            OR d.contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        )
+        OR current_user = 'freelance_admin'
+    );
+
+CREATE POLICY safe_insert_related ON Safe
+    FOR INSERT WITH CHECK (
+        deal_id IN (
+            SELECT d.deal_id FROM Deal d
+            WHERE d.client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+            OR d.contractor_id IN (SELECT co.contractor_id FROM Contractor co JOIN Users u ON co.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))
+        )
+        OR current_user = 'freelance_admin'
+    );
+
+CREATE POLICY safe_update_related ON Safe
+    FOR UPDATE USING (
         deal_id IN (
             SELECT d.deal_id FROM Deal d
             WHERE d.client_id IN (SELECT c.client_id FROM Client c JOIN Users u ON c.user_id = u.user_id WHERE u.login = current_setting('app.current_login', true))

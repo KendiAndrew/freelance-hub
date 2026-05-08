@@ -1,11 +1,33 @@
 'use client'
 
 import { useSession, signOut } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function Navbar() {
   const { data: session } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
+
+  useEffect(() => {
+    if (!session) return
+
+    async function fetchNotifs() {
+      try {
+        const res = await fetch('/api/notifications')
+        const data = await res.json()
+        setNotifCount(data.count || 0)
+      } catch {}
+    }
+
+    fetchNotifs()
+    const interval = setInterval(fetchNotifs, 30000)
+    return () => clearInterval(interval)
+  }, [session])
+
+  async function handleMarkRead() {
+    await fetch('/api/notifications', { method: 'PUT' })
+    setNotifCount(0)
+  }
 
   return (
     <nav className="hero-gradient shadow-lg sticky top-0 z-50">
@@ -42,8 +64,17 @@ export default function Navbar() {
                 )}
 
                 <div className="ml-2 pl-2 border-l border-white/20 flex items-center space-x-2">
-                  <a href="/profile" className="bg-white/15 text-white px-3 py-1.5 rounded-lg hover:bg-white/25 transition text-sm font-medium">
+                  <a
+                    href="/profile"
+                    onClick={handleMarkRead}
+                    className="relative bg-white/15 text-white px-3 py-1.5 rounded-lg hover:bg-white/25 transition text-sm font-medium"
+                  >
                     {session.user.firstName || session.user.login}
+                    {notifCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {notifCount > 9 ? '9+' : notifCount}
+                      </span>
+                    )}
                   </a>
                   <button
                     onClick={() => signOut()}
@@ -90,7 +121,10 @@ export default function Navbar() {
                 <a href="/deals" className="block text-indigo-100 hover:bg-white/10 px-3 py-2 rounded-lg">Угоди</a>
                 <a href="/complaints" className="block text-indigo-100 hover:bg-white/10 px-3 py-2 rounded-lg">Скарги</a>
                 <a href="/escrow" className="block text-indigo-100 hover:bg-white/10 px-3 py-2 rounded-lg">Ескроу</a>
-                <a href="/profile" className="block text-indigo-100 hover:bg-white/10 px-3 py-2 rounded-lg">Профіль</a>
+                <a href="/profile" className="block text-indigo-100 hover:bg-white/10 px-3 py-2 rounded-lg">
+                  Профіль
+                  {notifCount > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">{notifCount}</span>}
+                </a>
                 {session.user.role === 'admin' && (
                   <a href="/admin" className="block text-yellow-300 hover:bg-white/10 px-3 py-2 rounded-lg font-semibold">Адмін</a>
                 )}

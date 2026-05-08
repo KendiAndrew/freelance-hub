@@ -84,6 +84,12 @@ npm install
 
 > Очікуваний результат: `added X packages` без критичних помилок.
 
+> **Помилка на Windows** `npm : UnauthorizedAccess` — PowerShell блокує скрипти. Виконати один раз:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+> Після цього знову запустити `npm install`.
+
 ### Крок 6 — Налаштувати змінні середовища
 
 Скопіювати файл `.env.example` у `.env.local`:
@@ -115,22 +121,21 @@ psql -h localhost -U postgres -c "SELECT version();"
 
 > Введіть пароль з Кроку 3. Якщо з'явилась помилка `connection refused` — PostgreSQL не запущений. Відкрийте **Services** (Win+R → `services.msc`) і запустіть службу `postgresql-x64-XX`.
 
-**7.2 — Створити базу даних:**
+> **Windows / кирилиця**: якщо psql виводить кракозябри — виконати перед psql:
+> ```powershell
+> chcp 65001
+> ```
+
+**7.2 — Створити базу даних та завантажити схему:**
 
 ```powershell
 psql -h localhost -U postgres -c "CREATE DATABASE freelance_db;"
+psql -h localhost -U postgres -d freelance_db -f sql/init_db.sql
 ```
 
-**7.3 — Встановити кодування та завантажити дамп:**
+`init_db.sql` автоматично створює таблиці, ролі та наповнює базу тестовими даними.
 
-```powershell
-$env:PGCLIENTENCODING = "UTF8"
-psql -h localhost -U postgres -d freelance_db -f sql/freelance_db_dump.sql
-```
-
-> **Важливо:** команда `$env:PGCLIENTENCODING = "UTF8"` встановлює кодування для поточного сеансу PowerShell — це **обов'язково** для коректного відображення кириличних символів. Виконуйте обидві команди в одному вікні PowerShell без закриття.
-
-**7.4 — Перевірити що дані завантажились:**
+**7.3 — Перевірити що дані завантажились:**
 
 ```powershell
 psql -h localhost -U postgres -d freelance_db -c "SELECT login, role FROM users;"
@@ -187,6 +192,7 @@ npm run dev
 ```
 ├── app/                  # Сторінки (Next.js App Router)
 │   ├── api/              # API Routes (серверна частина)
+│   │   └── notifications/# Сповіщення (polling по Deal)
 │   ├── admin/            # Адмін-панель
 │   ├── projects/         # Каталог проектів
 │   ├── contractors/      # Каталог фрілансерів
