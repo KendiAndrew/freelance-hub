@@ -17,6 +17,7 @@ export default function DealsPage() {
   }, [session])
 
   async function updateStatus(dealId, status) {
+    if (status === 'Completed' && !confirm('Завершити угоду та звільнити кошти з ескроу?')) return
     const res = await fetch(`/api/deals/${dealId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -25,6 +26,11 @@ export default function DealsPage() {
     if (res.ok) {
       setDeals(deals.map(d => d.deal_id === dealId ? { ...d, status } : d))
     }
+  }
+
+  function getSpecLabel(spec) {
+    const labels = { 'Web Development': 'Веб-розробка', 'Design': 'Дизайн', 'Writing': 'Копірайтинг', 'Marketing': 'Маркетинг' }
+    return labels[spec] || spec
   }
 
   function getStatusBadge(status) {
@@ -76,7 +82,7 @@ export default function DealsPage() {
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <span className="font-bold text-gray-800">Угода #{deal.deal_id}</span>
                     <span className={`badge ${getStatusBadge(deal.status)}`}>{getStatusLabel(deal.status)}</span>
-                    {deal.specialization && <span className="badge badge-purple">{deal.specialization}</span>}
+                    {deal.specialization && <span className="badge badge-purple">{getSpecLabel(deal.specialization)}</span>}
                   </div>
                   <p className="text-gray-600 text-sm mb-2">{deal.project_desc || 'Без опису проекту'}</p>
                   <div className="flex flex-wrap gap-4 text-sm text-gray-400">

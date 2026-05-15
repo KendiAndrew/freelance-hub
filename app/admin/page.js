@@ -163,8 +163,8 @@ export default function AdminPage() {
                     #{i + 1}
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold text-gray-800">{c.first_name} {c.last_name}</div>
-                    <div className="text-gray-500 text-sm">{c.specialization || 'Не вказано'}</div>
+                    <div className="font-semibold text-gray-800">{c.full_name}</div>
+                    <div className="text-gray-500 text-sm">{{ 'Web Development': 'Веб-розробка', 'Design': 'Дизайн', 'Writing': 'Копірайтинг', 'Marketing': 'Маркетинг' }[c.specialization] || c.specialization || 'Не вказано'}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-amber-500 font-bold">{'★'.repeat(Math.min(5, Math.max(0, Math.round((c.rating || 0) / 20))))}{'☆'.repeat(5 - Math.min(5, Math.max(0, Math.round((c.rating || 0) / 20))))}</div>

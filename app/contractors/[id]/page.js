@@ -50,6 +50,11 @@ export default function ContractorDetailPage() {
     return '★'.repeat(stars) + '☆'.repeat(5 - stars)
   }
 
+  function getSpecLabel(spec) {
+    const labels = { 'Web Development': 'Веб-розробка', 'Design': 'Дизайн', 'Writing': 'Копірайтинг', 'Marketing': 'Маркетинг' }
+    return labels[spec] || spec || 'Не вказано'
+  }
+
   if (loading) return <div className="text-center py-20 text-gray-400">Завантаження...</div>
   if (!contractor || contractor.error) return <div className="text-center py-20 text-red-500">Фрілансера не знайдено</div>
 
@@ -66,7 +71,7 @@ export default function ContractorDetailPage() {
             <h1 className="text-2xl font-bold text-gray-800">{contractor.first_name} {contractor.last_name}</h1>
             <p className="text-gray-500">{contractor.city || 'Місто не вказано'}</p>
             <div className="text-amber-400 text-xl mt-2">{getRatingStars(contractor.rating)}</div>
-            <span className="badge badge-purple mt-2">{contractor.specialization || 'Не вказано'}</span>
+            <span className="badge badge-purple mt-2">{getSpecLabel(contractor.specialization)}</span>
           </div>
         </div>
 
@@ -123,7 +128,8 @@ export default function ContractorDetailPage() {
             <div key={r.ratings_id} className="card">
               <div className="flex justify-between items-start mb-2">
                 <span className="font-semibold text-gray-700">{r.reviewer_name}</span>
-                <span className="text-amber-400">{'★'.repeat(r.rating)}{'☆'.repeat(10 - r.rating)}</span>
+                <span className="text-amber-400">{'★'.repeat(Math.round(r.rating / 2))}{'☆'.repeat(5 - Math.round(r.rating / 2))}</span>
+                <span className="text-gray-400 text-xs ml-1">{r.rating}/10</span>
               </div>
               <p className="text-gray-600">{r.review_text}</p>
               <div className="text-gray-400 text-xs mt-2">{new Date(r.created_at).toLocaleDateString('uk-UA')}</div>

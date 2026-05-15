@@ -16,7 +16,11 @@ export default function NewProjectPage() {
       <div className="text-center py-20">
         <div className="text-gray-300 text-6xl mb-4">&#128274;</div>
         <div className="text-gray-500 text-lg">Тільки замовники можуть створювати проекти</div>
-        <a href="/login" className="btn-primary mt-4 inline-block">Увійти</a>
+        {session ? (
+          <a href="/" className="btn-primary mt-4 inline-block">На головну</a>
+        ) : (
+          <a href="/login" className="btn-primary mt-4 inline-block">Увійти</a>
+        )}
       </div>
     )
   }

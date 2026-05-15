@@ -500,7 +500,7 @@ GRANT SELECT (user_id, login, email, role, created_at) ON Users TO freelance_con
 GRANT SELECT ON Client TO freelance_contractor;
 GRANT SELECT, UPDATE ON Contractor TO freelance_contractor;
 GRANT SELECT ON Project TO freelance_contractor;
-GRANT SELECT, UPDATE ON Deal TO freelance_contractor;
+GRANT SELECT, INSERT, UPDATE ON Deal TO freelance_contractor;
 GRANT SELECT, INSERT, UPDATE ON ContractorTask TO freelance_contractor;
 GRANT SELECT ON Ratings TO freelance_contractor;
 GRANT SELECT ON ComplaintClient TO freelance_contractor;
