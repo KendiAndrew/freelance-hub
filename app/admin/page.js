@@ -109,13 +109,18 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stats.projectStats.map((row, i) => (
-                    <tr key={i} className="table-row border-b border-gray-100">
-                      {Object.values(row).map((val, j) => (
-                        <td key={j} className="py-3 px-4 text-gray-700 text-sm">{val?.toString() || '—'}</td>
-                      ))}
-                    </tr>
-                  ))}
+                  {stats.projectStats.map((row, i) => {
+                    const specMap = { 'Web Development': 'Веб-розробка', 'Design': 'Дизайн', 'Writing': 'Копірайтинг', 'Marketing': 'Маркетинг' }
+                    return (
+                      <tr key={i} className="table-row border-b border-gray-100">
+                        {Object.entries(row).map(([key, val], j) => (
+                          <td key={j} className="py-3 px-4 text-gray-700 text-sm">
+                            {key === 'specialization' ? (specMap[val] || val) : (val?.toString() || '—')}
+                          </td>
+                        ))}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

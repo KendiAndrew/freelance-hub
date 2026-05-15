@@ -77,7 +77,7 @@ export default function Navbar() {
                     )}
                   </a>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => signOut({ callbackUrl: '/' })}
                     className="bg-white/10 text-indigo-100 px-3 py-1.5 rounded-lg hover:bg-red-500 hover:text-white transition text-sm"
                   >
                     Вийти
@@ -128,7 +128,7 @@ export default function Navbar() {
                 {session.user.role === 'admin' && (
                   <a href="/admin" className="block text-yellow-300 hover:bg-white/10 px-3 py-2 rounded-lg font-semibold">Адмін</a>
                 )}
-                <button onClick={() => signOut()} className="text-red-300 hover:text-red-100 px-3 py-2">Вийти</button>
+                <button onClick={() => signOut({ callbackUrl: '/' })} className="text-red-300 hover:text-red-100 px-3 py-2">Вийти</button>
               </>
             ) : (
               <>

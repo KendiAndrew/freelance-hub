@@ -231,7 +231,7 @@ export default function ProjectDetailPage() {
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         <span className="font-semibold text-gray-800">{app.contractor_name}</span>
-                        {app.contractor_specialization && <span className="badge badge-purple">{app.contractor_specialization}</span>}
+                        {app.contractor_specialization && <span className="badge badge-purple">{getSpecLabel(app.contractor_specialization)}</span>}
                       </div>
                       {app.task_data?.comment && (
                         <p className="text-gray-600 text-sm mb-2">{app.task_data.comment}</p>
