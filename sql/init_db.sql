@@ -316,7 +316,7 @@ BEGIN
     WHERE contractor_id = NEW.reviewed_id;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Оновлення часу зміни для клієнта
 CREATE OR REPLACE FUNCTION update_client_rating()
@@ -327,7 +327,7 @@ BEGIN
     WHERE client_id = NEW.reviewer_id;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Перевірка незавершених контрактів фрілансера
 CREATE OR REPLACE FUNCTION check_contractor_unfinished_deals()

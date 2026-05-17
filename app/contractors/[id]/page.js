@@ -13,6 +13,9 @@ export default function ContractorDetailPage() {
   const [dealForm, setDealForm] = useState({ projectId: '', amount: '' })
   const [projects, setProjects] = useState([])
   const [message, setMessage] = useState('')
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [reviewForm, setReviewForm] = useState({ rating: '8', reviewText: '' })
+  const [reviewMessage, setReviewMessage] = useState('')
 
   useEffect(() => {
     fetch(`/api/contractors/${id}`)
@@ -27,6 +30,26 @@ export default function ContractorDetailPage() {
         .then(data => setProjects(data.filter(p => p.client_id === session.user.profileId)))
     }
   }, [session])
+
+  async function handleSubmitReview(e) {
+    e.preventDefault()
+    setReviewMessage('')
+    const res = await fetch('/api/ratings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reviewedId: id, projectId: null, rating: Number(reviewForm.rating), reviewText: reviewForm.reviewText })
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setReviewMessage('Відгук додано!')
+      setShowReviewForm(false)
+      setReviewForm({ rating: '8', reviewText: '' })
+      // refresh contractor data
+      fetch(`/api/contractors/${id}`).then(r => r.json()).then(setContractor)
+    } else {
+      setReviewMessage(data.error || 'Помилка додавання відгуку')
+    }
+  }
 
   async function handleCreateDeal(e) {
     e.preventDefault()
@@ -119,6 +142,42 @@ export default function ContractorDetailPage() {
           </div>
         )}
       </div>
+
+      {/* форма відгуку для клієнта */}
+      {session?.user.role === 'client' && (
+        <div className="card mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-bold text-gray-800">Залишити відгук</h2>
+            {!showReviewForm && (
+              <button onClick={() => setShowReviewForm(true)} className="btn-primary text-sm">+ Відгук</button>
+            )}
+          </div>
+          {reviewMessage && (
+            <div className={`px-4 py-3 rounded-xl mb-3 text-sm ${reviewMessage.includes('додано') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {reviewMessage}
+            </div>
+          )}
+          {showReviewForm && (
+            <form onSubmit={handleSubmitReview}>
+              <div className="mb-3">
+                <label className="label">Оцінка (1–10)</label>
+                <input type="number" className="input" min="1" max="10" value={reviewForm.rating}
+                  onChange={e => setReviewForm({ ...reviewForm, rating: e.target.value })} required />
+              </div>
+              <div className="mb-4">
+                <label className="label">Відгук</label>
+                <textarea className="input" rows={3} placeholder="Поділіться враженнями від роботи з виконавцем..."
+                  value={reviewForm.reviewText}
+                  onChange={e => setReviewForm({ ...reviewForm, reviewText: e.target.value })} required />
+              </div>
+              <div className="flex gap-3">
+                <button type="submit" className="btn-primary">Надіслати відгук</button>
+                <button type="button" onClick={() => setShowReviewForm(false)} className="btn-secondary">Скасувати</button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* відгуки */}
       <h2 className="text-xl font-bold text-gray-800 mb-4">Відгуки ({contractor.ratings?.length || 0})</h2>
