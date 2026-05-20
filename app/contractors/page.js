@@ -18,7 +18,7 @@ export default function ContractorsPage() {
 
     const res = await fetch(url)
     const data = await res.json()
-    setContractors(data)
+    setContractors(Array.isArray(data) ? data : [])
     setLoading(false)
   }
 
